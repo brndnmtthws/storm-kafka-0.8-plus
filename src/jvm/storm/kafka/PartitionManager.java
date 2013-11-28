@@ -87,7 +87,7 @@ public class PartitionManager {
             LOG.info("Read last commit offset from zookeeper: " + _committedTo);
         }
 
-        if (currentOffset - _committedTo > spoutConfig.maxOffsetBehind) {
+        if (currentOffset - _committedTo > spoutConfig.maxOffsetBehind || _committedTo <= 0) {
           LOG.info("Last commit offset from zookeeper: " + _committedTo);
           _committedTo = currentOffset;
           LOG.info("Commit offset " + _committedTo + " is more than " +
