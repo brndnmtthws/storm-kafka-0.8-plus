@@ -74,23 +74,24 @@ public class PartitionManager {
             LOG.warn("Error reading and/or parsing at ZkNode: " + committedPath(), e);
         }
 
-        if(!topologyInstanceId.equals(jsonTopologyId) && spoutConfig.forceFromStart) {
+        Long currentOffset = KafkaUtils.getOffset(_consumer, spoutConfig.topic, id.partition,  kafka.api.OffsetRequest.LatestTime());
+
+        if (!topologyInstanceId.equals(jsonTopologyId) && spoutConfig.forceFromStart) {
             _committedTo = KafkaUtils.getOffset(_consumer, spoutConfig.topic, id.partition, spoutConfig.startOffsetTime);
 	    LOG.info("Using startOffsetTime to choose last commit offset.");
         } else if(jsonTopologyId == null || jsonOffset == null) { // failed to parse JSON?
-            _committedTo = KafkaUtils.getOffset(_consumer, spoutConfig.topic, id.partition,  kafka.api.OffsetRequest.LatestTime());
+            _committedTo = currentOffset;
 	    LOG.info("Setting last commit offset to HEAD.");
         } else {
             _committedTo = jsonOffset;
-            Long currentOffset = KafkaUtils.getOffset(_consumer, spoutConfig.topic, id.partition,  kafka.api.OffsetRequest.LatestTime());
-            if (currentOffset - _committedTo > spoutConfig.maxOffsetBehind) {
-              LOG.info("Last commit offset from zookeeper: " + _committedTo);
-              _committedTo = currentOffset;
-              LOG.info("Commit offset " + _committedTo + " is more than " +
-                  spoutConfig.maxOffsetBehind + " behind, resetting to HEAD.");
-            } else {
-              LOG.info("Read last commit offset from zookeeper: " + _committedTo);
-            }
+            LOG.info("Read last commit offset from zookeeper: " + _committedTo);
+        }
+
+        if (currentOffset - _committedTo > spoutConfig.maxOffsetBehind) {
+          LOG.info("Last commit offset from zookeeper: " + _committedTo);
+          _committedTo = currentOffset;
+          LOG.info("Commit offset " + _committedTo + " is more than " +
+              spoutConfig.maxOffsetBehind + " behind, resetting to HEAD.");
         }
 
         LOG.info("Starting Kafka " + _consumer.host() + ":" + id.partition + " from offset " + _committedTo);
