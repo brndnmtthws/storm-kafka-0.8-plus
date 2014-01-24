@@ -79,6 +79,9 @@ public class ZkCoordinator implements PartitionCoordinator {
 				_managers.put(id, man);
 			}
 
+		} catch(java.net.SocketTimeoutException e) {
+			LOG.warn("Connection timed out when trying to refresh partitions.", e);
+			return;
 		} catch(Exception e) {
 			throw new RuntimeException(e);
 		}

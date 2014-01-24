@@ -18,32 +18,32 @@ public class DynamicBrokersReader {
 
 	public static final Logger LOG = LoggerFactory.getLogger(DynamicBrokersReader.class);
 
-    private CuratorFramework _curator;
-    private String _zkPath;
-    private String _topic;
-    
-    public DynamicBrokersReader(Map conf, String zkStr, String zkPath, String topic) {
+	private CuratorFramework _curator;
+	private String _zkPath;
+	private String _topic;
+
+	public DynamicBrokersReader(Map conf, String zkStr, String zkPath, String topic) {
 		_zkPath = zkPath;
 		_topic = topic;
-                try {
-                _curator = CuratorFrameworkFactory.newClient(
-                    zkStr,
-                    Utils.getInt(conf.get(Config.STORM_ZOOKEEPER_SESSION_TIMEOUT)),
-                    15000,
-                    new RetryNTimes(Utils.getInt(conf.get(Config.STORM_ZOOKEEPER_RETRY_TIMES)),
-                      Utils.getInt(conf.get(Config.STORM_ZOOKEEPER_RETRY_INTERVAL))));
-                _curator.start();
-                } catch (IOException ex)  {
-                        LOG.error("can't connect to zookeeper");
-                }
-    }
+		try {
+			_curator = CuratorFrameworkFactory.newClient(
+					zkStr,
+					Utils.getInt(conf.get(Config.STORM_ZOOKEEPER_SESSION_TIMEOUT)),
+					15000,
+					new RetryNTimes(Utils.getInt(conf.get(Config.STORM_ZOOKEEPER_RETRY_TIMES)),
+						Utils.getInt(conf.get(Config.STORM_ZOOKEEPER_RETRY_INTERVAL))));
+			_curator.start();
+		} catch (IOException ex)  {
+			LOG.error("can't connect to zookeeper");
+		}
+	}
 
-    /**
+	/**
 	 * Get all partitions with their current leaders
-     */
-    public GlobalPartitionInformation getBrokerInfo() {
+	 */
+	public GlobalPartitionInformation getBrokerInfo() throws java.net.SocketTimeoutException {
 		GlobalPartitionInformation globalPartitionInformation = new GlobalPartitionInformation();
-        try {
+		try {
 			int numPartitionsForTopic = getNumPartitions();
 			String brokerInfoPath = brokerPath();
 			for (int partition = 0; partition < numPartitionsForTopic; partition++) {
@@ -57,12 +57,14 @@ public class DynamicBrokersReader {
 					LOG.error("Node {} does not exist ", path);
 				}
 			}
-        } catch(Exception e) {
-            throw new RuntimeException(e);
-        }
+		} catch(java.net.SocketTimeoutException e) {
+			throw e;
+		} catch(Exception e) {
+			throw new RuntimeException(e);
+		}
 		LOG.info("Read partition info from zookeeper: " + globalPartitionInformation);
-        return globalPartitionInformation;
-    }
+		return globalPartitionInformation;
+	}
 
 
 
@@ -102,9 +104,9 @@ public class DynamicBrokersReader {
 		}
 	}
 
-    public void close() {
-        _curator.close();
-    }
+	public void close() {
+		_curator.close();
+	}
 
 	/**
 	 *
@@ -114,15 +116,15 @@ public class DynamicBrokersReader {
 	 * @param contents
 	 * @return
 	 */
-    private HostPort getBrokerHost(byte[] contents) {
-        try {
+	private HostPort getBrokerHost(byte[] contents) {
+		try {
 			Map<Object, Object> value = (Map<Object,Object>) JSONValue.parse(new String(contents, "UTF-8"));
 			String host = (String) value.get("host");
 			Integer port = ((Long) value.get("port")).intValue();
-            return new HostPort(host, port);
-        } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        }
-    }  
+			return new HostPort(host, port);
+		} catch (UnsupportedEncodingException e) {
+			throw new RuntimeException(e);
+		}
+	}
 
 }
