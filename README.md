@@ -17,7 +17,7 @@ Port of storm-kafka to support kafka >= 0.8.
     <dependency>
       <groupId>org.clojars.brenden</groupId>
       <artifactId>storm-kafka-0.8-plus</artifactId>
-			<version>0.1.8-SNAPSHOT</version>
+			<version>0.2.0-SNAPSHOT</version>
     </dependency>
   </dependencies>
 ```

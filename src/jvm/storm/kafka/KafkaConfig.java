@@ -9,28 +9,25 @@ public class KafkaConfig implements Serializable {
 
     public final BrokerHosts hosts;
     public final String topic;
-	public final String clientId;
+    public final String clientId;
 
-    public int fetchSizeBytes = 1024*1024;
+    public int fetchSizeBytes = 1024 * 1024;
     public int socketTimeoutMs = 10000;
-    public int bufferSizeBytes = 1024*1024;
+    public int bufferSizeBytes = 1024 * 1024;
     public MultiScheme scheme = new RawMultiScheme();
     public boolean forceFromStart = false;
     public long startOffsetTime = kafka.api.OffsetRequest.EarliestTime();
-    public long maxOffsetBehind = 10000;
+    public long maxOffsetBehind = 1000000;
+    public boolean useStartOffsetTimeIfOffsetOutOfRange = true;
 
     public KafkaConfig(BrokerHosts hosts, String topic) {
         this(hosts, topic, kafka.api.OffsetRequest.DefaultClientId());
     }
 
-	public KafkaConfig(BrokerHosts hosts, String topic, String clientId) {
-		this.hosts = hosts;
-		this.topic = topic;
-		this.clientId = clientId;
-	}
-
-    public void forceStartOffsetTime(long millis) {
-        startOffsetTime = millis;
-        forceFromStart = true;
+    public KafkaConfig(BrokerHosts hosts, String topic, String clientId) {
+        this.hosts = hosts;
+        this.topic = topic;
+        this.clientId = clientId;
     }
+
 }
