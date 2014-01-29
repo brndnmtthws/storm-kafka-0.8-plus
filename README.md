@@ -1,19 +1,38 @@
 storm-kafka-0.8-plus
 ====================
 
-Port of storm-kafka to support kafka >= 0.8
+Port of storm-kafka to support kafka >= 0.8.
 
-## Installing kafka 0.8 into local maven repository
+## Grab it from [clojars.org](https://clojars.org/)
 
-Unfortunately the current beta pom is slightly broken ([KAFKA-974](https://issues.apache.org/jira/browse/KAFKA-974)) so you might want to build your own
+```xml
+  <repositories>
+    <repository>
+      <id>clojars.org</id>
+      <url>http://clojars.org/repo</url>
+    </repository>
+  </repositories>
+  ...
+  <dependencies>
+    <dependency>
+      <groupId>org.clojars.brenden</groupId>
+      <artifactId>storm-kafka-0.8-plus</artifactId>
+			<version>0.1.8-SNAPSHOT</version>
+    </dependency>
+  </dependencies>
+```
 
-- checkout kafka 0.8 branch
-- Check [KAFKA-939](https://issues.apache.org/jira/browse/KAFKA-939) for instructions on how to handle javadoc erros when publishing
-- GPG:
-    - ```gpg2 --gen-key```
-    - ```cp ~/.gnupg/secring.gpg ~/.sbt/gpg/secring.asc```
-- publish kafka to local ivy repository
-    - ```./sbt "++2.9.2" clean package publish-local```
-- publish kafka to local maven repo
-    - ```mvn install:install-file -Dfile=$HOME/.ivy2/local/org.apache.kafka/kafka_2.9.2/0.8.0-beta1/jars/kafka_2.9.2.jar -DpomFile=$HOME/.ivy2/local/org.apache.kafka/kafka_2.9.2/0.8.0-beta1/poms/kafka_2.9.2.pom```
+## Installing Kafka 0.8 into local maven repository
 
+If you want to build storm-kafka-0.8-plus yourself, you can try these steps:
+
+```
+wget -q -c https://github.com/airbnb/kafka/archive/production.tar.gz
+tar xf production.tar.gz
+cd kafka-production
+./sbt "++2.10.3 release"
+./sbt "++2.10.3 make-pom"
+mvn install:install-file -DgroupId=org.apache.kafka -DartifactId=kafka_2.10 -Dversion="0.8.1" -Dpackaging=jar -Dfile=core/target/scala-2.10/kafka_2.10-0.8.1.jar -DpomFile=core/target/scala-2.10/kafka_2.10-0.8.1.pom
+cd ..
+mvn package
+```
