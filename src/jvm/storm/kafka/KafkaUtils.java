@@ -142,8 +142,9 @@ public class KafkaUtils {
                 fetchResponse = consumer.fetch(fetchRequest);
             } catch (Exception e) {
                 if (e instanceof ConnectException ||
-									 	e instanceof SocketTimeoutException) {
-                    throw new FailedFetchException(e);
+                    e instanceof SocketTimeoutException) {
+                    LOG.warn("Network error when fetching messages:", e);
+                    return msgs;
                 } else {
                     throw new RuntimeException(e);
                 }
@@ -158,7 +159,6 @@ public class KafkaUtils {
                     offset = startOffset;
                 } else {
                     String message = "Error fetching data from [" + partition + "] for topic [" + topic + "]: [" + error + "]";
-                    LOG.error(message);
                     throw new FailedFetchException(message);
                 }
             } else {

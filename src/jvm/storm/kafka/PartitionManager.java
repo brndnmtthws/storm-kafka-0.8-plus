@@ -146,13 +146,15 @@ public class PartitionManager {
         _fetchAPILatencyMax.update(millis);
         _fetchAPILatencyMean.update(millis);
         _fetchAPICallCount.incr();
-        int numMessages = countMessages(msgs);
-        _fetchAPIMessageCount.incrBy(numMessages);
+        if (msgs != null) {
+            int numMessages = countMessages(msgs);
+            _fetchAPIMessageCount.incrBy(numMessages);
 
-        for (MessageAndOffset msg : msgs) {
-            _pending.add(_emittedToOffset);
-            _waitingToEmit.add(new MessageAndRealOffset(msg.message(), _emittedToOffset));
-            _emittedToOffset = msg.nextOffset();
+            for (MessageAndOffset msg : msgs) {
+                _pending.add(_emittedToOffset);
+                _waitingToEmit.add(new MessageAndRealOffset(msg.message(), _emittedToOffset));
+                _emittedToOffset = msg.nextOffset();
+            }
         }
     }
 
