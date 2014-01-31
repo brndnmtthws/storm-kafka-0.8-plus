@@ -48,7 +48,8 @@ public class ZkCoordinator implements PartitionCoordinator {
         return _cachedList;
     }
 
-    void refresh() {
+    @Override
+    public void refresh() {
         try {
             LOG.info("Refreshing partition manager connections");
             GlobalPartitionInformation brokerInfo = _reader.getBrokerInfo();
@@ -79,6 +80,9 @@ public class ZkCoordinator implements PartitionCoordinator {
                 _managers.put(id, man);
             }
 
+        } catch (java.net.SocketTimeoutException e) {
+            LOG.warn("Socket timeout", e);
+            return;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -92,6 +96,6 @@ public class ZkCoordinator implements PartitionCoordinator {
     }
 
     private boolean myOwnership(Partition id) {
-      return id.partition % _totalTasks == _taskIndex;
+        return id.partition % _totalTasks == _taskIndex;
     }
 }

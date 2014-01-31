@@ -50,7 +50,8 @@ public class KafkaUtilsTest {
         int port = broker.getPort();
         broker.shutdown();
         SimpleConsumer simpleConsumer = new SimpleConsumer("localhost", port, 100, 1024, "testClient");
-        ByteBufferMessageSet messageAndOffsets = KafkaUtils.fetchMessages(config, simpleConsumer, new Partition(Broker.fromString(broker.getBrokerConnectionString()), 0), OffsetRequest.LatestTime());
+        KafkaUtils.Response response = KafkaUtils.fetchMessages(config, simpleConsumer, new Partition(Broker.fromString(broker.getBrokerConnectionString()), 0), OffsetRequest.LatestTime());
+        ByteBufferMessageSet messageAndOffsets = response.msgs;
         assertNull(messageAndOffsets);
     }
 
@@ -104,7 +105,8 @@ public class KafkaUtilsTest {
 
     private void sendMessageAndAssertValueForOffset(long offset) {
         String value = createTopicAndSendMessage();
-        ByteBufferMessageSet messageAndOffsets = KafkaUtils.fetchMessages(config, simpleConsumer, new Partition(Broker.fromString(broker.getBrokerConnectionString()), 0), offset);
+        KafkaUtils.Response response = KafkaUtils.fetchMessages(config, simpleConsumer, new Partition(Broker.fromString(broker.getBrokerConnectionString()), 0), offset);
+        ByteBufferMessageSet messageAndOffsets = response.msgs;
         String message = new String(Utils.toByteArray(messageAndOffsets.iterator().next().message().payload()));
         assertThat(message, is(equalTo(value)));
     }

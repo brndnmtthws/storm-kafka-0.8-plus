@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import storm.kafka.DynamicPartitionConnections;
 import storm.kafka.FailedFetchException;
 import storm.kafka.KafkaUtils;
+import storm.kafka.KafkaUtils.Response;
 import storm.kafka.Partition;
 import storm.trident.operation.TridentCollector;
 import storm.trident.spout.IOpaquePartitionedTridentSpout;
@@ -98,11 +99,13 @@ public class TridentKafkaEmitter {
         } else {
             offset = KafkaUtils.getOffset(consumer, _config.topic, partition.partition, _config);
         }
-        ByteBufferMessageSet msgs = fetchMessages(consumer, partition, offset);
-        long endoffset = offset;
-        for (MessageAndOffset msg : msgs) {
-            emit(collector, msg.message());
-            endoffset = msg.nextOffset();
+        Response response = fetchMessages(consumer, partition, offset);
+        long endoffset = response.offset;
+        if (response.msgs != null) {
+            for (MessageAndOffset msg : response.msgs) {
+                emit(collector, msg.message());
+                endoffset = msg.nextOffset();
+            }
         }
         Map newMeta = new HashMap();
         newMeta.put("offset", offset);
@@ -115,14 +118,14 @@ public class TridentKafkaEmitter {
         return newMeta;
     }
 
-    private ByteBufferMessageSet fetchMessages(SimpleConsumer consumer, Partition partition, long offset) {
+    private Response fetchMessages(SimpleConsumer consumer, Partition partition, long offset) {
         long start = System.nanoTime();
-        ByteBufferMessageSet msgs = KafkaUtils.fetchMessages(_config, consumer, partition, offset);
+        Response response = KafkaUtils.fetchMessages(_config, consumer, partition, offset);
         long end = System.nanoTime();
         long millis = (end - start) / 1000000;
         _kafkaMeanFetchLatencyMetric.update(millis);
         _kafkaMaxFetchLatencyMetric.update(millis);
-        return msgs;
+        return response;
     }
 
     /**
@@ -140,16 +143,19 @@ public class TridentKafkaEmitter {
             SimpleConsumer consumer = _connections.register(partition);
             long offset = (Long) meta.get("offset");
             long nextOffset = (Long) meta.get("nextOffset");
-            ByteBufferMessageSet msgs = fetchMessages(consumer, partition, offset);
-            for (MessageAndOffset msg : msgs) {
-                if (offset == nextOffset) {
-                    break;
+            Response response = fetchMessages(consumer, partition, offset);
+            offset = response.offset;
+            if (response.msgs != null) {
+                for (MessageAndOffset msg : response.msgs) {
+                    if (offset == nextOffset) {
+                        break;
+                    }
+                    if (offset > nextOffset) {
+                        throw new RuntimeException("Error when re-emitting batch. overshot the end offset");
+                    }
+                    emit(collector, msg.message());
+                    offset = msg.nextOffset();
                 }
-                if (offset > nextOffset) {
-                    throw new RuntimeException("Error when re-emitting batch. overshot the end offset");
-                }
-                emit(collector, msg.message());
-                offset = msg.nextOffset();
             }
         }
     }

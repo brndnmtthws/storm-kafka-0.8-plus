@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import storm.kafka.KafkaSpout.EmitState;
 import storm.kafka.KafkaSpout.MessageAndRealOffset;
 import storm.kafka.trident.MaxMetric;
+import storm.kafka.KafkaUtils.Response;
 
 import java.util.*;
 
@@ -140,17 +141,18 @@ public class PartitionManager {
 
     private void fill() {
         long start = System.nanoTime();
-        ByteBufferMessageSet msgs = KafkaUtils.fetchMessages(_spoutConfig, _consumer, _partition, _emittedToOffset);
+        Response response = KafkaUtils.fetchMessages(_spoutConfig, _consumer, _partition, _emittedToOffset);
         long end = System.nanoTime();
         long millis = (end - start) / 1000000;
         _fetchAPILatencyMax.update(millis);
         _fetchAPILatencyMean.update(millis);
         _fetchAPICallCount.incr();
-        if (msgs != null) {
-            int numMessages = countMessages(msgs);
+        _emittedToOffset = response.offset;
+        if (response.msgs != null) {
+            int numMessages = countMessages(response.msgs);
             _fetchAPIMessageCount.incrBy(numMessages);
 
-            for (MessageAndOffset msg : msgs) {
+            for (MessageAndOffset msg : response.msgs) {
                 _pending.add(_emittedToOffset);
                 _waitingToEmit.add(new MessageAndRealOffset(msg.message(), _emittedToOffset));
                 _emittedToOffset = msg.nextOffset();

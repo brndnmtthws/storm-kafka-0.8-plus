@@ -17,6 +17,7 @@ import storm.kafka.trident.ZkBrokerReader;
 
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -129,7 +130,17 @@ public class KafkaUtils {
         }
     }
 
-    public static ByteBufferMessageSet fetchMessages(KafkaConfig config, SimpleConsumer consumer, Partition partition, long offset) {
+    static public class Response {
+        public final ByteBufferMessageSet msgs;
+        public final long offset;
+
+        public Response(ByteBufferMessageSet msgs, long offset) {
+            this.msgs = msgs;
+            this.offset = offset;
+        }
+    }
+
+    public static Response fetchMessages(KafkaConfig config, SimpleConsumer consumer, Partition partition, long offset) {
         ByteBufferMessageSet msgs = null;
         String topic = config.topic;
         int partitionId = partition.partition;
@@ -142,9 +153,11 @@ public class KafkaUtils {
                 fetchResponse = consumer.fetch(fetchRequest);
             } catch (Exception e) {
                 if (e instanceof ConnectException ||
-                    e instanceof SocketTimeoutException) {
+                    e instanceof SocketTimeoutException ||
+                    e instanceof IOException
+                    ) {
                     LOG.warn("Network error when fetching messages:", e);
-                    return msgs;
+                    throw new FailedFetchException(e);
                 } else {
                     throw new RuntimeException(e);
                 }
@@ -165,6 +178,6 @@ public class KafkaUtils {
                 msgs = fetchResponse.messageSet(topic, partitionId);
             }
         }
-        return msgs;
+        return new Response(msgs, offset);
     }
 }
