@@ -96,6 +96,6 @@ public class ZkCoordinator implements PartitionCoordinator {
     }
 
     private boolean myOwnership(Partition id) {
-        return id.partition % _totalTasks == _taskIndex;
+      return id.partition % _totalTasks == _taskIndex;
     }
 }
