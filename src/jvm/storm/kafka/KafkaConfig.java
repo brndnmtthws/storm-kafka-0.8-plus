@@ -17,7 +17,7 @@ public class KafkaConfig implements Serializable {
     public MultiScheme scheme = new RawMultiScheme();
     public boolean forceFromStart = false;
     public long startOffsetTime = kafka.api.OffsetRequest.EarliestTime();
-    public long maxOffsetBehind = 10000;
+    public long maxOffsetBehind = 100000;
     public boolean useStartOffsetTimeIfOffsetOutOfRange = true;
 
     public KafkaConfig(BrokerHosts hosts, String topic) {
