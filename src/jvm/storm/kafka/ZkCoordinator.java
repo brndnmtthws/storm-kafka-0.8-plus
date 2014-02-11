@@ -6,6 +6,9 @@ import org.slf4j.LoggerFactory;
 import storm.kafka.trident.GlobalPartitionInformation;
 
 import java.util.*;
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
+import java.io.IOException;
 
 public class ZkCoordinator implements PartitionCoordinator {
     public static final Logger LOG = LoggerFactory.getLogger(ZkCoordinator.class);
@@ -80,11 +83,15 @@ public class ZkCoordinator implements PartitionCoordinator {
                 _managers.put(id, man);
             }
 
-        } catch (java.net.SocketTimeoutException e) {
-            LOG.warn("Socket timeout", e);
-            return;
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            if (e instanceof ConnectException ||
+                    e instanceof SocketTimeoutException ||
+                    e instanceof IOException) {
+                LOG.warn("Socket error", e);
+                return;
+            } else {
+                throw new RuntimeException(e);
+            }
         }
         _cachedList = new ArrayList<PartitionManager>(_managers.values());
         LOG.info("Finished refreshing");
