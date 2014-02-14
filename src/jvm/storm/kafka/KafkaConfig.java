@@ -13,6 +13,7 @@ public class KafkaConfig implements Serializable {
 
     public int fetchSizeBytes = 1024 * 1024;
     public int socketTimeoutMs = 10000;
+    public int fetchMaxWait = 10000;
     public int bufferSizeBytes = 1024 * 1024;
     public MultiScheme scheme = new RawMultiScheme();
     public boolean forceFromStart = false;

@@ -147,7 +147,7 @@ public class KafkaUtils {
         for (int errors = 0; errors < 2 && msgs == null; errors++) {
             FetchRequestBuilder builder = new FetchRequestBuilder();
             FetchRequest fetchRequest = builder.addFetch(topic, partitionId, offset, config.fetchSizeBytes).
-                    clientId(config.clientId).build();
+                    clientId(config.clientId).maxWait(config.fetchMaxWait).build();
             FetchResponse fetchResponse;
             try {
                 fetchResponse = consumer.fetch(fetchRequest);
