@@ -18,7 +18,7 @@ public class ZkCoordinator implements PartitionCoordinator {
     int _totalTasks;
     String _topologyInstanceId;
     Map<Partition, PartitionManager> _managers = new HashMap();
-    List<PartitionManager> _cachedList;
+    List<PartitionManager> _cachedList = new ArrayList<PartitionManager>();
     Long _lastRefreshTime = null;
     int _refreshFreqMs;
     DynamicPartitionConnections _connections;
@@ -44,7 +44,8 @@ public class ZkCoordinator implements PartitionCoordinator {
 
     @Override
     public List<PartitionManager> getMyManagedPartitions() {
-        if (_lastRefreshTime == null || (System.currentTimeMillis() - _lastRefreshTime) > _refreshFreqMs) {
+        if (_cachedList == null || _lastRefreshTime == null ||
+            (System.currentTimeMillis() - _lastRefreshTime) > _refreshFreqMs) {
             refresh();
             _lastRefreshTime = System.currentTimeMillis();
         }

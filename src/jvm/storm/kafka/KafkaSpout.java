@@ -116,15 +116,6 @@ public class KafkaSpout extends BaseRichSpout {
     @Override
     public void nextTuple() {
         List<PartitionManager> managers = _coordinator.getMyManagedPartitions();
-        if (managers == null) {
-          try {
-            Thread.sleep(300);
-          } catch (InterruptedException e) {
-            // ...
-          }
-          _coordinator.refresh();
-          return;
-        }
         for (int i = 0; i < managers.size(); i++) {
 
             try {
