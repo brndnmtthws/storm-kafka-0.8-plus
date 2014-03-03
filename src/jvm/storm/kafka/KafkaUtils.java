@@ -15,9 +15,9 @@ import storm.kafka.trident.IBrokerReader;
 import storm.kafka.trident.StaticBrokerReader;
 import storm.kafka.trident.ZkBrokerReader;
 
+import java.io.IOException;
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -77,83 +77,87 @@ public class KafkaUtils {
             _partitionToOffset.put(partition, offset);
         }
 
-        @Override
-        public Object getValueAndReset() {
-            try {
-                long totalSpoutLag = 0;
-                long totalLatestTimeOffset = 0;
-                long totalLatestEmittedOffset = 0;
-                HashMap ret = new HashMap();
-                if (_partitions != null && _partitions.size() == _partitionToOffset.size()) {
-                    for (Map.Entry<Partition, Long> e : _partitionToOffset.entrySet()) {
-                        Partition partition = e.getKey();
-                        SimpleConsumer consumer = _connections.getConnection(partition);
-                        if (consumer == null) {
-                            LOG.warn("partitionToOffset contains partition not found in _connections. Stale partition data?");
-                            return null;
-                        }
-                        long latestTimeOffset = getOffset(consumer, _topic, partition.partition, kafka.api.OffsetRequest.LatestTime());
-                        if (latestTimeOffset == 0) {
-                            LOG.warn("No data found in Kafka Partition " + partition.getId());
-                            return null;
-                        }
-                        long latestEmittedOffset = e.getValue();
-                        long spoutLag = latestTimeOffset - latestEmittedOffset;
-                        ret.put(partition.getId() + "/" + "spoutLag", spoutLag);
-                        ret.put(partition.getId() + "/" + "latestTime", latestTimeOffset);
-                        ret.put(partition.getId() + "/" + "latestEmittedOffset", latestEmittedOffset);
-                        totalSpoutLag += spoutLag;
-                        totalLatestTimeOffset += latestTimeOffset;
-                        totalLatestEmittedOffset += latestEmittedOffset;
-                    }
-                    ret.put("totalSpoutLag", totalSpoutLag);
-                    ret.put("totalLatestTime", totalLatestTimeOffset);
-                    ret.put("totalLatestEmittedOffset", totalLatestEmittedOffset);
-                    return ret;
-                } else {
-                    LOG.info("Metrics Tick: Not enough data to calculate spout lag.");
-                }
-            } catch (Throwable t) {
-                LOG.warn("Metrics Tick: Exception when computing kafkaOffset metric.", t);
+      @Override
+      public Object getValueAndReset() {
+        try {
+          long totalSpoutLag = 0;
+          long totalLatestTimeOffset = 0;
+          long totalEarliestTimeOffset = 0;
+          long totalLatestEmittedOffset = 0;
+          HashMap ret = new HashMap();
+          if (_partitions != null && _partitions.size() == _partitionToOffset.size()) {
+            for (Map.Entry<Partition, Long> e : _partitionToOffset.entrySet()) {
+              Partition partition = e.getKey();
+              SimpleConsumer consumer = _connections.getConnection(partition);
+              if (consumer == null) {
+                LOG.warn("partitionToOffset contains partition not found in _connections. Stale partition data?");
+                return null;
+              }
+              long latestTimeOffset = getOffset(consumer, _topic, partition.partition, kafka.api.OffsetRequest.LatestTime());
+              long earliestTimeOffset = getOffset(consumer, _topic, partition.partition, kafka.api.OffsetRequest.EarliestTime());
+              if (latestTimeOffset == 0 || earliestTimeOffset == 0) {
+                LOG.warn("No data found in Kafka Partition " + partition.getId());
+                return null;
+              }
+              long latestEmittedOffset = e.getValue();
+              long spoutLag = latestTimeOffset - latestEmittedOffset;
+              ret.put(partition.getId() + "/" + "spoutLag", spoutLag);
+              ret.put(partition.getId() + "/" + "latestTimeOffset", latestTimeOffset);
+              ret.put(partition.getId() + "/" + "earliestTimeOffset", earliestTimeOffset);
+              ret.put(partition.getId() + "/" + "latestEmittedOffset", latestEmittedOffset);
+              totalSpoutLag += spoutLag;
+              totalLatestTimeOffset += latestTimeOffset;
+              totalLatestEmittedOffset += latestEmittedOffset;
             }
-            return null;
+            ret.put("totalSpoutLag", totalSpoutLag);
+            ret.put("totalLatestTimeOffset", totalLatestTimeOffset);
+            ret.put("totalEarliestTimeOffset", totalEarliestTimeOffset);
+            ret.put("totalLatestEmittedOffset", totalLatestEmittedOffset);
+            return ret;
+          } else {
+            LOG.info("Metrics Tick: Not enough data to calculate spout lag.");
+          }
+        } catch (Throwable t) {
+          LOG.warn("Metrics Tick: Exception when computing kafkaOffset metric.", t);
         }
+        return null;
+      }
 
-        public void refreshPartitions(Set<Partition> partitions) {
-            _partitions = partitions;
-            Iterator<Partition> it = _partitionToOffset.keySet().iterator();
-            while (it.hasNext()) {
-                if (!partitions.contains(it.next())) {
-                    it.remove();
-                }
-            }
+      public void refreshPartitions(Set<Partition> partitions) {
+        _partitions = partitions;
+        Iterator<Partition> it = _partitionToOffset.keySet().iterator();
+        while (it.hasNext()) {
+          if (!partitions.contains(it.next())) {
+            it.remove();
+          }
         }
+      }
     }
 
-    static public class Response {
-        public final ByteBufferMessageSet msgs;
-        public final long offset;
+  static public class Response {
+    public final ByteBufferMessageSet msgs;
+    public final long offset;
 
-        public Response(ByteBufferMessageSet msgs, long offset) {
-            this.msgs = msgs;
-            this.offset = offset;
-        }
+    public Response(ByteBufferMessageSet msgs, long offset) {
+      this.msgs = msgs;
+      this.offset = offset;
     }
+  }
 
-    public static Response fetchMessages(KafkaConfig config, SimpleConsumer consumer, Partition partition, long offset) {
-        ByteBufferMessageSet msgs = null;
-        String topic = config.topic;
-        int partitionId = partition.partition;
-        for (int errors = 0; errors < 2 && msgs == null; errors++) {
-            FetchRequestBuilder builder = new FetchRequestBuilder();
-            FetchRequest fetchRequest = builder.addFetch(topic, partitionId, offset, config.fetchSizeBytes).
-                    clientId(config.clientId).maxWait(config.fetchMaxWait).build();
-            FetchResponse fetchResponse;
-            try {
-                fetchResponse = consumer.fetch(fetchRequest);
-            } catch (Exception e) {
-                if (e instanceof ConnectException ||
-                    e instanceof SocketTimeoutException ||
+  public static Response fetchMessages(KafkaConfig config, SimpleConsumer consumer, Partition partition, long offset) {
+    ByteBufferMessageSet msgs = null;
+    String topic = config.topic;
+    int partitionId = partition.partition;
+    for (int errors = 0; errors < 2 && msgs == null; errors++) {
+      FetchRequestBuilder builder = new FetchRequestBuilder();
+      FetchRequest fetchRequest = builder.addFetch(topic, partitionId, offset, config.fetchSizeBytes).
+          clientId(config.clientId).maxWait(config.fetchMaxWait).build();
+      FetchResponse fetchResponse;
+      try {
+        fetchResponse = consumer.fetch(fetchRequest);
+      } catch (Exception e) {
+        if (e instanceof ConnectException ||
+            e instanceof SocketTimeoutException ||
                     e instanceof IOException
                     ) {
                     LOG.warn("Network error when fetching messages:", e);

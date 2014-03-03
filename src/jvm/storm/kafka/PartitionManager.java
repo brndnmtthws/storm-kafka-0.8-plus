@@ -16,8 +16,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import storm.kafka.KafkaSpout.EmitState;
 import storm.kafka.KafkaSpout.MessageAndRealOffset;
-import storm.kafka.trident.MaxMetric;
 import storm.kafka.KafkaUtils.Response;
+import storm.kafka.trident.MaxMetric;
 
 import java.util.*;
 
