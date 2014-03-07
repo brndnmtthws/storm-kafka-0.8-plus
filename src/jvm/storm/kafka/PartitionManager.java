@@ -216,15 +216,6 @@ public class PartitionManager {
     return _spoutConfig.zkRoot + "/" + _spoutConfig.id + "/" + _partition.getId();
   }
 
-  public long queryPartitionOffsetLatestTime() {
-    return KafkaUtils.getOffset(_consumer, _spoutConfig.topic, _partition.partition,
-        OffsetRequest.LatestTime());
-  }
-
-  public long lastCommittedOffset() {
-    return _committedTo;
-  }
-
   public long lastCompletedOffset() {
     if (_pending.isEmpty()) {
       return _emittedToOffset;
