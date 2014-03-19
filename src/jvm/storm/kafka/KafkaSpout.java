@@ -83,7 +83,7 @@ public class KafkaSpout extends BaseRichSpout {
             @Override
             public Object getValueAndReset() {
                 List<PartitionManager> pms = _coordinator.getMyManagedPartitions();
-                Set<Partition> latestPartitions = new HashSet();
+                Set<Partition> latestPartitions = new HashSet<>();
                 for (PartitionManager pm : pms) {
                     latestPartitions.add(pm.getPartition());
                 }

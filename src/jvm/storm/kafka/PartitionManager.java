@@ -177,9 +177,10 @@ public class PartitionManager {
   }
 
   public void fail(Long offset) {
-    //TODO: should it use in-memory ack set to skip anything that's been acked but not committed???
-    // things might get crazy with lots of timeouts
-    if (_emittedToOffset > offset) {
+    if (_pending.size() > _spoutConfig.maxOffsetBehind) {
+      // Too many things pending!
+      _pending.headSet(offset).clear();
+    } else if (_emittedToOffset > offset) {
       _emittedToOffset = offset;
       _pending.tailSet(offset).clear();
     }
