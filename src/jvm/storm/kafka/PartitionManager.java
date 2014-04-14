@@ -40,6 +40,7 @@ public class PartitionManager {
 
   Long _emittedToOffset;
   SortedSet<Long> _pending = new TreeSet<Long>();
+  SortedSet<Long> failed = new TreeSet<Long>();
   Long _committedTo;
   LinkedList<MessageAndRealOffset> _waitingToEmit = new LinkedList<MessageAndRealOffset>();
   Partition _partition;
@@ -141,35 +142,44 @@ public class PartitionManager {
 
   private void fill() {
     long start = System.nanoTime();
-    Response response = KafkaUtils.fetchMessages(_spoutConfig, _consumer, _partition, _emittedToOffset);
+    long offset;
+    final boolean had_failed = !failed.isEmpty();
+
+    // Are there failed tuples? If so, fetch those first.
+    if (had_failed) {
+      offset = failed.first();
+    } else {
+      offset = _emittedToOffset + 1;
+    }
+
+    Response response = KafkaUtils.fetchMessages(_spoutConfig, _consumer, _partition, offset);
     long end = System.nanoTime();
     long millis = (end - start) / 1000000;
     _fetchAPILatencyMax.update(millis);
     _fetchAPILatencyMean.update(millis);
     _fetchAPICallCount.incr();
-    _emittedToOffset = response.offset;
     if (response.msgs != null) {
-      int numMessages = countMessages(response.msgs);
-      _fetchAPIMessageCount.incrBy(numMessages);
+      int numMessages = 0;
 
       for (MessageAndOffset msg : response.msgs) {
-        _pending.add(_emittedToOffset);
-        _waitingToEmit.add(new MessageAndRealOffset(msg.message(), _emittedToOffset));
-        _emittedToOffset = msg.nextOffset();
+        final Long cur_offset = msg.offset();
+        if (!had_failed || failed.contains(cur_offset)) {
+          numMessages += 1;
+          _pending.add(cur_offset);
+          _waitingToEmit.add(new MessageAndRealOffset(msg.message(), cur_offset));
+          _emittedToOffset = Math.max(cur_offset, _emittedToOffset);
+          if (had_failed) {
+            failed.remove(cur_offset);
+          }
+        }
       }
+      _fetchAPIMessageCount.incrBy(numMessages);
     }
-  }
-
-  private int countMessages(ByteBufferMessageSet messageSet) {
-    int counter = 0;
-    for (MessageAndOffset messageAndOffset : messageSet) {
-      counter = counter + 1;
-    }
-    return counter;
   }
 
   public void ack(Long offset) {
-    if (_pending.size() > _spoutConfig.maxOffsetBehind) {
+    if (!_pending.isEmpty() && _pending.first() < offset - _spoutConfig.maxOffsetBehind) {
+      // Too many things pending!
       _pending.headSet(offset).clear();
     } else {
       _pending.remove(offset);
@@ -177,22 +187,17 @@ public class PartitionManager {
   }
 
   public void fail(Long offset) {
-    if (_pending.size() > _spoutConfig.maxOffsetBehind) {
-      // Too many things pending!
-      _pending.headSet(offset).clear();
-    } else if (_emittedToOffset > offset) {
-      _emittedToOffset = offset;
-      _pending.tailSet(offset).clear();
-    }
+    LOG.debug("failing at offset=" + offset + " with _pending.size()=" + _pending.size() + " pending and _emittedToOffset=" + _emittedToOffset);
+    failed.add(offset);
   }
 
   public void commit() {
-    //LOG.info("Committing offset for " + _partition);
+    LOG.debug("Committing offset for " + _partition);
     long committedTo;
     if (_pending.isEmpty()) {
       committedTo = _emittedToOffset;
     } else {
-      committedTo = _pending.first();
+      committedTo = _pending.first() - 1;
     }
     if (committedTo != _committedTo) {
       LOG.debug("Writing committed offset to ZK: " + committedTo);
