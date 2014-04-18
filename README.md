@@ -1,7 +1,9 @@
-storm-kafka-0.8-plus
+Storm spout for Kafka 0.8+
 ====================
 
-Port of storm-kafka to support kafka >= 0.8.
+This is a port of storm-kafka to support kafka >= 0.8.
+
+I forked the project [from here](https://github.com/wurstmeister/storm-kafka-0.8-plus).  My version has an emphasis on throughput and robustness, rather than adding new features.
 
 ## Grab it from [clojars.org](https://clojars.org/)
 
@@ -17,7 +19,7 @@ Port of storm-kafka to support kafka >= 0.8.
     <dependency>
       <groupId>org.clojars.brenden</groupId>
       <artifactId>storm-kafka-0.8-plus</artifactId>
-			<version>0.2.0-SNAPSHOT</version>
+      <version>0.2.11</version>
     </dependency>
   </dependencies>
 ```
