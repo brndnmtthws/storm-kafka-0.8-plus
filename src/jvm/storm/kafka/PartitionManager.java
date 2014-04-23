@@ -50,6 +50,7 @@ public class PartitionManager {
   DynamicPartitionConnections _connections;
   ZkState _state;
   Map _stormConf;
+  long numberFailed, numberAcked;
 
 
   public PartitionManager(DynamicPartitionConnections connections, String topologyInstanceId, ZkState state, Map stormConf, SpoutConfig spoutConfig, Partition id) {
@@ -60,6 +61,7 @@ public class PartitionManager {
     _consumer = connections.register(id.host, id.partition);
     _state = state;
     _stormConf = stormConf;
+    numberAcked = numberFailed = 0;
 
     String jsonTopologyId = null;
     Long jsonOffset = null;
@@ -184,11 +186,16 @@ public class PartitionManager {
     } else {
       _pending.remove(offset);
     }
+    numberAcked++;
   }
 
   public void fail(Long offset) {
     LOG.debug("failing at offset=" + offset + " with _pending.size()=" + _pending.size() + " pending and _emittedToOffset=" + _emittedToOffset);
     failed.add(offset);
+    numberFailed++;
+    if (numberAcked == 0 && numberFailed > _spoutConfig.maxOffsetBehind) {
+      throw new RuntimeException("Too many tuple failures");
+    }
   }
 
   public void commit() {
