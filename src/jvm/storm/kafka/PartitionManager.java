@@ -190,11 +190,19 @@ public class PartitionManager {
   }
 
   public void fail(Long offset) {
-    LOG.debug("failing at offset=" + offset + " with _pending.size()=" + _pending.size() + " pending and _emittedToOffset=" + _emittedToOffset);
-    failed.add(offset);
-    numberFailed++;
-    if (numberAcked == 0 && numberFailed > _spoutConfig.maxOffsetBehind) {
-      throw new RuntimeException("Too many tuple failures");
+    if (offset < _emittedToOffset - _spoutConfig.maxOffsetBehind) {
+      LOG.info(
+          "Skipping failed tuple at offset=" + offset +
+          " because it's more than maxOffsetBehind=" + _spoutConfig.maxOffsetBehind +
+          " behind _emittedToOffset=" + _emittedToOffset
+      );
+    } else {
+      LOG.debug("failing at offset=" + offset + " with _pending.size()=" + _pending.size() + " pending and _emittedToOffset=" + _emittedToOffset);
+      failed.add(offset);
+      numberFailed++;
+      if (numberAcked == 0 && numberFailed > _spoutConfig.maxOffsetBehind) {
+        throw new RuntimeException("Too many tuple failures");
+      }
     }
   }
 
