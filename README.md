@@ -19,7 +19,7 @@ I forked the project [from here](https://github.com/wurstmeister/storm-kafka-0.8
     <dependency>
       <groupId>org.clojars.brenden</groupId>
       <artifactId>storm-kafka-0.8-plus</artifactId>
-      <version>0.2.11</version>
+      <version>0.3.0</version>
     </dependency>
   </dependencies>
 ```
