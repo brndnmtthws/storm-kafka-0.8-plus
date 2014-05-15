@@ -1,3 +1,20 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package storm.kafka;
 
 import backtype.storm.Config;
@@ -10,8 +27,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import storm.kafka.trident.GlobalPartitionInformation;
 
-import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.net.SocketTimeoutException;
 import java.util.List;
 import java.util.Map;
 
@@ -34,15 +51,15 @@ public class DynamicBrokersReader {
                     new RetryNTimes(Utils.getInt(conf.get(Config.STORM_ZOOKEEPER_RETRY_TIMES)),
                             Utils.getInt(conf.get(Config.STORM_ZOOKEEPER_RETRY_INTERVAL))));
             _curator.start();
-        } catch (IOException ex) {
-            LOG.error("can't connect to zookeeper");
+        } catch (Exception ex) {
+            LOG.error("Couldn't connect to zookeeper", ex);
         }
     }
 
     /**
      * Get all partitions with their current leaders
      */
-    public GlobalPartitionInformation getBrokerInfo() throws java.net.SocketTimeoutException {
+    public GlobalPartitionInformation getBrokerInfo() throws SocketTimeoutException {
       GlobalPartitionInformation globalPartitionInformation = new GlobalPartitionInformation();
         try {
             int numPartitionsForTopic = getNumPartitions();
@@ -58,7 +75,7 @@ public class DynamicBrokersReader {
                     LOG.error("Node {} does not exist ", path);
                 }
             }
-				} catch(java.net.SocketTimeoutException e) {
+        } catch (SocketTimeoutException e) {
 					throw e;
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -105,9 +122,9 @@ public class DynamicBrokersReader {
         }
     }
 
-	public void close() {
-		_curator.close();
-	}
+    public void close() {
+        _curator.close();
+    }
 
     /**
      * [zk: localhost:2181(CONNECTED) 56] get /brokers/ids/0

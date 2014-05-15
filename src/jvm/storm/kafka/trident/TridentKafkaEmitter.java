@@ -1,3 +1,20 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package storm.kafka.trident;
 
 import backtype.storm.Config;
@@ -5,9 +22,9 @@ import backtype.storm.metric.api.CombinedMetric;
 import backtype.storm.metric.api.MeanReducer;
 import backtype.storm.metric.api.ReducedMetric;
 import backtype.storm.task.TopologyContext;
-import backtype.storm.utils.Utils;
 import com.google.common.collect.ImmutableMap;
 import kafka.javaapi.consumer.SimpleConsumer;
+import kafka.javaapi.message.ByteBufferMessageSet;
 import kafka.message.Message;
 import kafka.message.MessageAndOffset;
 import org.slf4j.Logger;
@@ -15,7 +32,6 @@ import org.slf4j.LoggerFactory;
 import storm.kafka.DynamicPartitionConnections;
 import storm.kafka.FailedFetchException;
 import storm.kafka.KafkaUtils;
-import storm.kafka.KafkaUtils.Response;
 import storm.kafka.Partition;
 import storm.trident.operation.TridentCollector;
 import storm.trident.spout.IOpaquePartitionedTridentSpout;
@@ -27,10 +43,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Date: 21/05/2013
- * Time: 08:38
- */
 public class TridentKafkaEmitter {
 
     public static final Logger LOG = LoggerFactory.getLogger(TridentKafkaEmitter.class);
@@ -49,9 +61,9 @@ public class TridentKafkaEmitter {
         _connections = new DynamicPartitionConnections(_config, KafkaUtils.makeBrokerReader(conf, _config));
         _topologyName = (String) conf.get(Config.TOPOLOGY_NAME);
         _kafkaOffsetMetric = new KafkaUtils.KafkaOffsetMetric(_config.topic, _connections);
-        context.registerMetric("kafkaOffset", _kafkaOffsetMetric, 60);
-        _kafkaMeanFetchLatencyMetric = context.registerMetric("kafkaFetchAvg", new MeanReducer(), 60);
-        _kafkaMaxFetchLatencyMetric = context.registerMetric("kafkaFetchMax", new MaxMetric(), 60);
+        context.registerMetric("kafkaOffset", _kafkaOffsetMetric, _config.metricsTimeBucketSizeInSecs);
+        _kafkaMeanFetchLatencyMetric = context.registerMetric("kafkaFetchAvg", new MeanReducer(), _config.metricsTimeBucketSizeInSecs);
+        _kafkaMaxFetchLatencyMetric = context.registerMetric("kafkaFetchMax", new MaxMetric(), _config.metricsTimeBucketSizeInSecs);
     }
 
 
@@ -98,13 +110,11 @@ public class TridentKafkaEmitter {
         } else {
             offset = KafkaUtils.getOffset(consumer, _config.topic, partition.partition, _config);
         }
-        Response response = fetchMessages(consumer, partition, offset);
-        long endoffset = response.offset;
-        if (response.msgs != null) {
-            for (MessageAndOffset msg : response.msgs) {
-                emit(collector, msg.message());
-                endoffset = msg.nextOffset();
-            }
+        ByteBufferMessageSet msgs = fetchMessages(consumer, partition, offset);
+        long endoffset = offset;
+        for (MessageAndOffset msg : msgs) {
+            emit(collector, msg.message());
+            endoffset = msg.nextOffset();
         }
         Map newMeta = new HashMap();
         newMeta.put("offset", offset);
@@ -117,14 +127,14 @@ public class TridentKafkaEmitter {
         return newMeta;
     }
 
-    private Response fetchMessages(SimpleConsumer consumer, Partition partition, long offset) {
+    private ByteBufferMessageSet fetchMessages(SimpleConsumer consumer, Partition partition, long offset) {
         long start = System.nanoTime();
-        Response response = KafkaUtils.fetchMessages(_config, consumer, partition, offset);
+        ByteBufferMessageSet msgs = KafkaUtils.fetchMessages(_config, consumer, partition, offset);
         long end = System.nanoTime();
         long millis = (end - start) / 1000000;
         _kafkaMeanFetchLatencyMetric.update(millis);
         _kafkaMaxFetchLatencyMetric.update(millis);
-        return response;
+        return msgs;
     }
 
     /**
@@ -142,26 +152,22 @@ public class TridentKafkaEmitter {
             SimpleConsumer consumer = _connections.register(partition);
             long offset = (Long) meta.get("offset");
             long nextOffset = (Long) meta.get("nextOffset");
-            Response response = fetchMessages(consumer, partition, offset);
-            offset = response.offset;
-            if (response.msgs != null) {
-                for (MessageAndOffset msg : response.msgs) {
-                    if (offset == nextOffset) {
-                        break;
-                    }
-                    if (offset > nextOffset) {
-                        throw new RuntimeException("Error when re-emitting batch. overshot the end offset");
-                    }
-                    emit(collector, msg.message());
-                    offset = msg.nextOffset();
+            ByteBufferMessageSet msgs = fetchMessages(consumer, partition, offset);
+            for (MessageAndOffset msg : msgs) {
+                if (offset == nextOffset) {
+                    break;
                 }
+                if (offset > nextOffset) {
+                    throw new RuntimeException("Error when re-emitting batch. overshot the end offset");
+                }
+                emit(collector, msg.message());
+                offset = msg.nextOffset();
             }
         }
     }
 
     private void emit(TridentCollector collector, Message msg) {
-        Iterable<List<Object>> values =
-                _config.scheme.deserialize(Utils.toByteArray(msg.payload()));
+        Iterable<List<Object>> values = KafkaUtils.generateTuples(_config, msg);
         if (values != null) {
             for (List<Object> value : values) {
                 collector.emit(value);

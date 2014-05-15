@@ -17,13 +17,21 @@
  */
 package storm.kafka;
 
-public class FailedFetchException extends RuntimeException {
+import backtype.storm.spout.SchemeAsMultiScheme;
 
-    public FailedFetchException(String message) {
-        super(message);
+import java.util.Arrays;
+import java.util.List;
+
+public class KeyValueSchemeAsMultiScheme extends SchemeAsMultiScheme{
+
+    public KeyValueSchemeAsMultiScheme(KeyValueScheme scheme) {
+        super(scheme);
     }
 
-    public FailedFetchException(Exception e) {
-        super(e);
+    public Iterable<List<Object>> deserializeKeyAndValue(final byte[] key, final byte[] value) {
+        List<Object> o = ((KeyValueScheme)scheme).deserializeKeyAndValue(key, value);
+        if(o == null) return null;
+        else return Arrays.asList(o);
     }
+
 }

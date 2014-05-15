@@ -1,3 +1,20 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package storm.kafka;
 
 import java.util.ArrayList;
@@ -12,13 +29,10 @@ public class StaticCoordinator implements PartitionCoordinator {
 
     public StaticCoordinator(DynamicPartitionConnections connections, Map stormConf, SpoutConfig config, ZkState state, int taskIndex, int totalTasks, String topologyInstanceId) {
         StaticHosts hosts = (StaticHosts) config.hosts;
-        List<Partition> partitions = hosts.getPartitionInformation().getOrderedPartitions();
-        for (int i = taskIndex; i < partitions.size(); i += totalTasks) {
-            Partition myPartition = partitions.get(i);
+        List<Partition> myPartitions = KafkaUtils.calculatePartitionsForTask(hosts.getPartitionInformation(), totalTasks, taskIndex);
+        for (Partition myPartition : myPartitions) {
             _managers.put(myPartition, new PartitionManager(connections, topologyInstanceId, state, stormConf, config, myPartition));
-
         }
-
         _allManagers = new ArrayList(_managers.values());
     }
 
@@ -32,5 +46,6 @@ public class StaticCoordinator implements PartitionCoordinator {
     }
 
     @Override
-    public void refresh() {}
+    public void refresh() { return; }
+
 }
