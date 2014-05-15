@@ -151,7 +151,7 @@ public class PartitionManager {
     if (had_failed) {
       offset = failed.first();
     } else {
-      offset = _emittedToOffset + 1;
+      offset = _emittedToOffset;
     }
 
     Response response = KafkaUtils.fetchMessages(_spoutConfig, _consumer, _partition, offset);
@@ -165,11 +165,15 @@ public class PartitionManager {
 
       for (MessageAndOffset msg : response.msgs) {
         final Long cur_offset = msg.offset();
+        if (cur_offset < offset) {
+            // Skip any old offsets.
+            continue;
+        }
         if (!had_failed || failed.contains(cur_offset)) {
           numMessages += 1;
           _pending.add(cur_offset);
           _waitingToEmit.add(new MessageAndRealOffset(msg.message(), cur_offset));
-          _emittedToOffset = Math.max(cur_offset, _emittedToOffset);
+          _emittedToOffset = Math.max(msg.nextOffset(), _emittedToOffset);
           if (had_failed) {
             failed.remove(cur_offset);
           }
