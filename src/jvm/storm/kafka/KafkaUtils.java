@@ -101,8 +101,8 @@ public class KafkaUtils {
         public Object getValueAndReset() {
             try {
                 long totalSpoutLag = 0;
-                long totalLatestTimeOffset = 0;
                 long totalEarliestTimeOffset = 0;
+                long totalLatestTimeOffset = 0;
                 long totalLatestEmittedOffset = 0;
                 HashMap ret = new HashMap();
                 if (_partitions != null && _partitions.size() == _partitionToOffset.size()) {
@@ -122,16 +122,17 @@ public class KafkaUtils {
                         long latestEmittedOffset = e.getValue();
                         long spoutLag = latestTimeOffset - latestEmittedOffset;
                         ret.put(partition.getId() + "/" + "spoutLag", spoutLag);
-                        ret.put(partition.getId() + "/" + "latestTimeOffset", latestTimeOffset);
                         ret.put(partition.getId() + "/" + "earliestTimeOffset", earliestTimeOffset);
+                        ret.put(partition.getId() + "/" + "latestTimeOffset", latestTimeOffset);
                         ret.put(partition.getId() + "/" + "latestEmittedOffset", latestEmittedOffset);
                         totalSpoutLag += spoutLag;
+                        totalEarliestTimeOffset += earliestTimeOffset;
                         totalLatestTimeOffset += latestTimeOffset;
                         totalLatestEmittedOffset += latestEmittedOffset;
                     }
                     ret.put("totalSpoutLag", totalSpoutLag);
-                    ret.put("totalLatestTimeOffset", totalLatestTimeOffset);
                     ret.put("totalEarliestTimeOffset", totalEarliestTimeOffset);
+                    ret.put("totalLatestTimeOffset", totalLatestTimeOffset);
                     ret.put("totalLatestEmittedOffset", totalLatestEmittedOffset);
                     return ret;
                 } else {
@@ -151,16 +152,6 @@ public class KafkaUtils {
                     it.remove();
                 }
             }
-        }
-    }
-
-    static public class Response {
-        public final ByteBufferMessageSet msgs;
-        public final long offset;
-
-        public Response(ByteBufferMessageSet msgs, long offset) {
-            this.msgs = msgs;
-            this.offset = offset;
         }
     }
 

@@ -96,7 +96,7 @@ public class PartitionManager {
             LOG.info("Last commit offset from zookeeper: " + _committedTo);
             _committedTo = currentOffset;
             LOG.info("Commit offset " + _committedTo + " is more than " +
-                    spoutConfig.maxOffsetBehind + " behind, resetting to HEAD.");
+                    spoutConfig.maxOffsetBehind + " behind, resetting to startOffsetTime=" + spoutConfig.startOffsetTime);
         }
 
         LOG.info("Starting Kafka " + _consumer.host() + ":" + id.partition + " from offset " + _committedTo);
@@ -127,7 +127,7 @@ public class PartitionManager {
             if (toEmit == null) {
                 return EmitState.NO_EMITTED;
             }
-            Iterable<List<Object>> tups = _spoutConfig.scheme.deserialize(Utils.toByteArray(toEmit.msg.payload()));
+            Iterable<List<Object>> tups = KafkaUtils.generateTuples(_spoutConfig, toEmit.msg);
             if (tups != null) {
                 for (List<Object> tup : tups) {
                     collector.emit(tup, new KafkaMessageId(_partition, toEmit.offset));
@@ -213,30 +213,24 @@ public class PartitionManager {
     }
 
     public void commit() {
-        LOG.debug("Committing offset for " + _partition);
-        long committedTo;
-        if (_pending.isEmpty()) {
-            committedTo = _emittedToOffset;
-        } else {
-            committedTo = _pending.first() - 1;
-        }
-        if (committedTo != _committedTo) {
-            LOG.debug("Writing committed offset to ZK: " + committedTo);
-
+        long lastCompletedOffset = lastCompletedOffset();
+        if (lastCompletedOffset != lastCompletedOffset) {
+            LOG.debug("Writing last completed offset (" + lastCompletedOffset + ") to ZK for " + _partition + " for topology: " + _topologyInstanceId);
             Map<Object, Object> data = (Map<Object, Object>) ImmutableMap.builder()
                     .put("topology", ImmutableMap.of("id", _topologyInstanceId,
                             "name", _stormConf.get(Config.TOPOLOGY_NAME)))
-                    .put("offset", committedTo)
+                    .put("offset", lastCompletedOffset)
                     .put("partition", _partition.partition)
                     .put("broker", ImmutableMap.of("host", _partition.host.host,
                             "port", _partition.host.port))
                     .put("topic", _spoutConfig.topic).build();
             _state.writeJSON(committedPath(), data);
 
-            LOG.debug("Wrote committed offset to ZK: " + committedTo);
-            _committedTo = committedTo;
+            _committedTo = lastCompletedOffset;
+            LOG.debug("Wrote last completed offset (" + lastCompletedOffset + ") to ZK for " + _partition + " for topology: " + _topologyInstanceId);
+        } else {
+            LOG.debug("No new offset for " + _partition + " for topology: " + _topologyInstanceId);
         }
-        LOG.debug("Committed offset " + committedTo + " for " + _partition + " for topology: " + _topologyInstanceId);
     }
 
     private String committedPath() {
